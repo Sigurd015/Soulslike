@@ -2,7 +2,7 @@
 
 Soulslike game made with Unity
 
-Animations and Model from [Mixamo](https://www.mixamo.com/)
+Animations and models from [Mixamo](https://www.mixamo.com/)
 
 ## Reference
 

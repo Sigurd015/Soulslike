@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -6,7 +7,7 @@ using UnityEngine;
 public class ActorController : MonoBehaviour
 {
     public GameObject model;
-    
+
     [Header("===== Movement Settings =====")]
     public float walkSpeed = 2.0f;
     public float runMultiplier = 2.0f;
@@ -15,24 +16,35 @@ public class ActorController : MonoBehaviour
     public float rollVelocity = 1.0f;
     public float jabVelocity = 3.0f;
 
+    [Header("===== Friction Settings =====")]
+    public PhysicMaterial fricitionOne;
+    public PhysicMaterial fricitionZero;
+
     private PlayerInput pi;
     private Animator anim;
     private Rigidbody rigid;
+    private CapsuleCollider col;
     private Vector3 movingVec;
     private bool lockPlanar = false;
     private Vector3 thrushVec;
+    private bool canAttack;
+    private float lerpTarget;
+    private Vector3 deltaPos;
+
     // Start is called before the first frame update
     void Start()
     {
         pi = GetComponent<PlayerInput>();
         anim = model.GetComponent<Animator>();
         rigid = GetComponent<Rigidbody>();
+        col = GetComponent<CapsuleCollider>();
     }
 
     // Update is called once per frame
     void Update()
     {
         Locomotion();
+        Combat();
     }
 
     void Locomotion()
@@ -49,24 +61,33 @@ public class ActorController : MonoBehaviour
         if (pi.jump)
         {
             anim.SetTrigger("jump");
+            canAttack = false;
         }
 
         // Roll
-        if (pi.roll)
+        if (pi.roll || rigid.velocity.magnitude > rollVelocityThreshold)
         {
             anim.SetTrigger("roll");
+            canAttack = false;
         }
-        if (rigid.velocity.magnitude > rollVelocityThreshold)
+    }
+
+    void Combat()
+    {
+        if (pi.rightAttack && CheckAnimatorStateWithName("ground") && canAttack)
         {
-            anim.SetTrigger("roll");
+            anim.SetTrigger("attack");
         }
+
+        anim.SetBool("defense", pi.defense);
     }
 
     private void FixedUpdate()
     {
-        //rigid.position += movingVec * Time.fixedDeltaTime;
+        rigid.position += deltaPos;
         rigid.velocity = new Vector3(movingVec.x, rigid.velocity.y, movingVec.z) + thrushVec;
         thrushVec = Vector3.zero;
+        deltaPos = Vector3.zero;
     }
 
     // Sensor messages
@@ -75,7 +96,7 @@ public class ActorController : MonoBehaviour
         anim.SetBool("isGround", isGround);
     }
 
-    // Animation messages
+    // Default animator layer messages
     void OnJumpEnter()
     {
         pi.inputEnabled = false;
@@ -85,8 +106,15 @@ public class ActorController : MonoBehaviour
 
     void OnGroundEnter()
     {
+        col.material = fricitionOne;
         pi.inputEnabled = true;
         lockPlanar = false;
+        canAttack = true;
+    }
+
+    void OnGroundExit()
+    {
+        col.material = fricitionZero;
     }
 
     void OnFallEnter()
@@ -111,5 +139,47 @@ public class ActorController : MonoBehaviour
     void OnJabUpdate()
     {
         thrushVec = model.transform.forward * anim.GetFloat("jabVelocity");
+    }
+
+    // Attack animator layer messages
+    void OnAttack1HAEnter()
+    {
+        pi.inputEnabled = false;
+        lerpTarget = 1.0f;
+    }
+
+    void OnAttack1HAUpdate()
+    {
+        // Changed to use root motion
+        //thrushVec = model.transform.forward * anim.GetFloat("attack1HAVelocity");
+        anim.SetLayerWeight(anim.GetLayerIndex("attack"), Mathf.Lerp(anim.GetLayerWeight(anim.GetLayerIndex("attack")), lerpTarget, 0.1f));
+    }
+
+    void OnAttackIdleEnter()
+    {
+        pi.inputEnabled = true;
+        lerpTarget = 0.0f;
+    }
+
+    void OnAttackIdleUpdate()
+    {
+        anim.SetLayerWeight(anim.GetLayerIndex("attack"), Mathf.Lerp(anim.GetLayerWeight(anim.GetLayerIndex("attack")), lerpTarget, 0.1f));
+    }
+
+    // Root motion
+    public void OnUpdateRM(object _deltaPos)
+    {
+        if (CheckAnimatorStateWithName("attack1HA", "attack") || CheckAnimatorStateWithName("attack1HB", "attack") || CheckAnimatorStateWithName("attack1HC", "attack"))
+            deltaPos += (Vector3)_deltaPos;
+    }
+
+    public bool CheckAnimatorStateWithName(string stateName, string layerName = "base")
+    {
+        return anim.GetCurrentAnimatorStateInfo(anim.GetLayerIndex(layerName)).IsName(stateName);
+    }
+
+    public bool CheckAnimatorStateWithTag(string tagName, string layerName = "base")
+    {
+        return anim.GetCurrentAnimatorStateInfo(anim.GetLayerIndex(layerName)).IsTag(tagName);
     }
 }

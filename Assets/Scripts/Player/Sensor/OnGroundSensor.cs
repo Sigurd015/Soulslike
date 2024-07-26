@@ -13,7 +13,7 @@ public class OnGroundSensor : MonoBehaviour
     private Vector3 pointBottom;
     private float radius;
 
-    void Awake()
+    void Start()
     {
         capcol = transform.parent.GetComponent<CapsuleCollider>();
         radius = capcol.radius - 0.05f;
