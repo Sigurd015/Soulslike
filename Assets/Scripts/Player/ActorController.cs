@@ -7,6 +7,7 @@ using UnityEngine;
 public class ActorController : MonoBehaviour
 {
     public GameObject model;
+    public CameraController camcon;
 
     [Header("===== Movement Settings =====")]
     public float walkSpeed = 2.0f;
@@ -24,12 +25,13 @@ public class ActorController : MonoBehaviour
     private Animator anim;
     private Rigidbody rigid;
     private CapsuleCollider col;
-    private Vector3 movingVec;
+    private Vector3 planarVec;
     private bool lockPlanar = false;
     private Vector3 thrushVec;
     private bool canAttack;
     private float lerpTarget;
     private Vector3 deltaPos;
+    private bool trackDirection = false;
 
     // Start is called before the first frame update
     void Start()
@@ -49,13 +51,31 @@ public class ActorController : MonoBehaviour
 
     void Locomotion()
     {
-        anim.SetFloat("forward", Mathf.Lerp(anim.GetFloat("forward"), pi.dmag * ((pi.run) ? 2.0f : 1.0f), 0.5f));
+        if (camcon.lockState)
+        {
+            Vector3 localDevc = transform.InverseTransformVector(pi.dvec);
+            anim.SetFloat("right", localDevc.x * ((pi.run) ? 2.0f : 1.0f));
+            anim.SetFloat("forward", localDevc.z * ((pi.run) ? 2.0f : 1.0f));
 
-        if (pi.dmag > 0.1f && pi.inputEnabled)
-            model.transform.forward = Vector3.Slerp(model.transform.forward, pi.dvec, 0.3f);
+            if (trackDirection)
+                model.transform.forward = planarVec.normalized;
+            else
+                model.transform.forward = transform.forward;
 
-        if (!lockPlanar)
-            movingVec = pi.dmag * model.transform.forward * walkSpeed * ((pi.run) ? runMultiplier : 1.0f);
+            if (!lockPlanar)
+                planarVec = pi.dvec * walkSpeed * ((pi.run) ? runMultiplier : 1.0f);
+        }
+        else
+        {
+            anim.SetFloat("right", 0);
+            anim.SetFloat("forward", Mathf.Lerp(anim.GetFloat("forward"), pi.dmag * ((pi.run) ? 2.0f : 1.0f), 0.5f));
+
+            if (pi.dmag > 0.1f && pi.inputEnabled)
+                model.transform.forward = Vector3.Slerp(model.transform.forward, pi.dvec, 0.3f);
+
+            if (!lockPlanar)
+                planarVec = pi.dmag * model.transform.forward * walkSpeed * ((pi.run) ? runMultiplier : 1.0f);
+        }
 
         // Jump
         if (pi.jump)
@@ -85,7 +105,7 @@ public class ActorController : MonoBehaviour
     private void FixedUpdate()
     {
         rigid.position += deltaPos;
-        rigid.velocity = new Vector3(movingVec.x, rigid.velocity.y, movingVec.z) + thrushVec;
+        rigid.velocity = new Vector3(planarVec.x, rigid.velocity.y, planarVec.z) + thrushVec;
         thrushVec = Vector3.zero;
         deltaPos = Vector3.zero;
     }
@@ -99,9 +119,8 @@ public class ActorController : MonoBehaviour
     // Default animator layer messages
     void OnJumpEnter()
     {
-        pi.inputEnabled = false;
-        lockPlanar = true;
-        thrushVec.y = jumpVelocity;
+        trackDirection = true;
+        thrushVec.y = jumpVelocity;      
     }
 
     void OnGroundEnter()
@@ -110,30 +129,20 @@ public class ActorController : MonoBehaviour
         pi.inputEnabled = true;
         lockPlanar = false;
         canAttack = true;
+        trackDirection = false;
     }
 
     void OnGroundExit()
     {
         col.material = fricitionZero;
-    }
-
-    void OnFallEnter()
-    {
         pi.inputEnabled = false;
         lockPlanar = true;
     }
 
     void OnRollEnter()
     {
-        pi.inputEnabled = false;
-        lockPlanar = true;
         thrushVec.y = rollVelocity;
-    }
-
-    void OnJabEnter()
-    {
-        pi.inputEnabled = false;
-        lockPlanar = true;
+        trackDirection = true;
     }
 
     void OnJabUpdate()
