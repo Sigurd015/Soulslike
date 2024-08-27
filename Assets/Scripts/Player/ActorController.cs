@@ -29,9 +29,11 @@ public class ActorController : MonoBehaviour
     private bool lockPlanar = false;
     private Vector3 thrushVec;
     private bool canAttack;
-    private float lerpTarget;
     private Vector3 deltaPos;
     private bool trackDirection = false;
+
+    //Temp
+    public bool leftIsShield = true;
 
     // Start is called before the first frame update
     void Start()
@@ -94,12 +96,34 @@ public class ActorController : MonoBehaviour
 
     void Combat()
     {
-        if (pi.rightAttack && CheckAnimatorStateWithName("ground") && canAttack)
+        if ((CheckAnimatorStateWithName("ground") || CheckAnimatorStateWithTag("attack")) && canAttack)
         {
-            anim.SetTrigger("attack");
+            if (pi.leftAttack && !leftIsShield)
+            {
+                anim.SetBool("rightAttack", false);
+                anim.SetTrigger("attack");
+            }
+            if (pi.rightAttack)
+            {
+                anim.SetBool("rightAttack", true);
+                anim.SetTrigger("attack");
+            }
         }
 
-        anim.SetBool("defense", pi.defense);
+        if (leftIsShield)
+        {
+            anim.SetLayerWeight(anim.GetLayerIndex("defense"), 1);
+
+            if (CheckAnimatorStateWithName("ground"))
+            {
+                anim.SetBool("defense", pi.defense);
+            }
+        }
+        else
+        {
+            anim.SetLayerWeight(anim.GetLayerIndex("defense"), 0);
+            anim.SetBool("defense", false);
+        }   
     }
 
     private void FixedUpdate()
@@ -120,7 +144,7 @@ public class ActorController : MonoBehaviour
     void OnJumpEnter()
     {
         trackDirection = true;
-        thrushVec.y = jumpVelocity;      
+        thrushVec.y = jumpVelocity;
     }
 
     void OnGroundEnter()
@@ -150,35 +174,10 @@ public class ActorController : MonoBehaviour
         thrushVec = model.transform.forward * anim.GetFloat("jabVelocity");
     }
 
-    // Attack animator layer messages
-    void OnAttack1HAEnter()
-    {
-        pi.inputEnabled = false;
-        lerpTarget = 1.0f;
-    }
-
-    void OnAttack1HAUpdate()
-    {
-        // Changed to use root motion
-        //thrushVec = model.transform.forward * anim.GetFloat("attack1HAVelocity");
-        anim.SetLayerWeight(anim.GetLayerIndex("attack"), Mathf.Lerp(anim.GetLayerWeight(anim.GetLayerIndex("attack")), lerpTarget, 0.1f));
-    }
-
-    void OnAttackIdleEnter()
-    {
-        pi.inputEnabled = true;
-        lerpTarget = 0.0f;
-    }
-
-    void OnAttackIdleUpdate()
-    {
-        anim.SetLayerWeight(anim.GetLayerIndex("attack"), Mathf.Lerp(anim.GetLayerWeight(anim.GetLayerIndex("attack")), lerpTarget, 0.1f));
-    }
-
     // Root motion
     public void OnUpdateRM(object _deltaPos)
     {
-        if (CheckAnimatorStateWithName("attack1HA", "attack") || CheckAnimatorStateWithName("attack1HB", "attack") || CheckAnimatorStateWithName("attack1HC", "attack"))
+        if (CheckAnimatorStateWithTag("attack"))
             deltaPos += (Vector3)_deltaPos;
     }
 
