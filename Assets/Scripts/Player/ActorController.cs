@@ -49,6 +49,10 @@ public class ActorController : MonoBehaviour
     {
         Locomotion();
         Combat();
+
+        // Temp
+        if (Input.GetKeyDown(KeyCode.T))
+            anim.SetTrigger("hit");
     }
 
     void Locomotion()
@@ -96,7 +100,7 @@ public class ActorController : MonoBehaviour
 
     void Combat()
     {
-        if ((CheckAnimatorStateWithName("ground") || CheckAnimatorStateWithTag("attack")) && canAttack)
+        if ((CheckAnimatorStateWithName("ground") || CheckAnimatorStateWithTag("attack1HL") || CheckAnimatorStateWithTag("attack1HR")) && canAttack)
         {
             if (pi.leftAttack && !leftIsShield)
             {
@@ -123,7 +127,7 @@ public class ActorController : MonoBehaviour
         {
             anim.SetLayerWeight(anim.GetLayerIndex("defense"), 0);
             anim.SetBool("defense", false);
-        }   
+        }
     }
 
     private void FixedUpdate()
@@ -174,10 +178,20 @@ public class ActorController : MonoBehaviour
         thrushVec = model.transform.forward * anim.GetFloat("jabVelocity");
     }
 
+    void OnHitEnter()
+    {
+        pi.inputEnabled = false;
+    }
+
+    void OnAttackExit()
+    {
+        model.SendMessage("WeaponDisable");
+    }
+
     // Root motion
     public void OnUpdateRM(object _deltaPos)
     {
-        if (CheckAnimatorStateWithTag("attack"))
+        if (CheckAnimatorStateWithTag("attack1HL") || CheckAnimatorStateWithTag("attack1HR"))
             deltaPos += (Vector3)_deltaPos;
     }
 
@@ -189,5 +203,11 @@ public class ActorController : MonoBehaviour
     public bool CheckAnimatorStateWithTag(string tagName, string layerName = "base")
     {
         return anim.GetCurrentAnimatorStateInfo(anim.GetLayerIndex(layerName)).IsTag(tagName);
+    }
+
+    // Used by actor manager
+    public void SentTrigger(string triggerName)
+    {
+        anim.SetTrigger(triggerName);
     }
 }
